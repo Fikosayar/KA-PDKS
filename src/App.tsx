@@ -321,7 +321,7 @@ export default function App() {
     });
 
     // İzinli bugün
-    const onLeaveIds = new Set(
+    const onLeaveIds = new Set<string>(
       leaveRequests.filter(r =>
         r.status === 'approved' && !r.deleted &&
         r.startDate <= todayStr && r.endDate >= todayStr
@@ -343,7 +343,7 @@ export default function App() {
     });
 
     // Kişi listelerini de döndür
-    const userMap = new Map(activeUsers.map(u => [u.uid, u]));
+    const userMap = new Map<string, UserProfile>(activeUsers.map(u => [u.uid, u]));
     const presentList = [...presentIds].map(uid => {
       const u = userMap.get(uid);
       return { uid, name: u?.name || uid, detail: `Giriş: ${userFirstIn.get(uid) || '-'}` };
@@ -505,14 +505,14 @@ export default function App() {
   useEffect(() => {
     if (!user || !profile) return;
     
-    let q;
+    let q: any;
     if (profile.role === 'admin') {
       q = query(collection(db, 'attendance'), orderBy('timestamp', 'desc'), limit(1000));
     } else {
       q = query(collection(db, 'attendance'), where('userId', '==', user.uid));
     }
 
-    const unsubscribe = onSnapshot(q, { includeMetadataChanges: false }, (snapshot) => {
+    const unsubscribe = onSnapshot(q, { includeMetadataChanges: false }, (snapshot: any) => {
       const newLogs = snapshot.docs
         .map(doc => ({
           id: doc.id,

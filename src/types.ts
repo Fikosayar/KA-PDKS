@@ -82,6 +82,7 @@ export interface AttendanceLog {
     latitude: number;
     longitude: number;
   };
+  manualEntry?: boolean;
   isRemote?: boolean; // Nakliye / uzaktan giriş
   remoteNote?: string; // Personelin nakliye notu/mazereti
   deleted?: boolean;

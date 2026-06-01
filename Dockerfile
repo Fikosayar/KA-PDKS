@@ -11,13 +11,19 @@ RUN npm install
 # Kaynak kodları kopyala
 COPY . .
 
-# Vite önyüzünü derle
+# Vite önyüzünü derle (Sunucularda OOM hatasını önlemek için bellek sınırını ayarlıyoruz)
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 RUN npm run build
 
 # --- Prodüksiyon Aşaması ---
 FROM node:20-alpine
 
 WORKDIR /app
+
+# 1. Aşamanın bitmesini beklemeye zorlamak için önce build edilmiş dosyaları kopyalıyoruz.
+# Böylece BuildKit iki npm install komutunu aynı anda çalıştırıp sunucunun RAM'ini tüketmez.
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server.ts ./
 
 # Paket dosyalarını kopyala
 COPY package.json package-lock.json* ./
@@ -28,14 +34,8 @@ RUN npm install --omit=dev
 # Sunucuyu çalıştırmak için tsx'i global kur
 RUN npm install -g tsx
 
-# Derlenmiş önyüzü kopyala
-COPY --from=builder /app/dist ./dist
-
-# Arkayüz dosyalarını ve yapılandırmayı kopyala
-COPY --from=builder /app/server.ts ./
-
 ENV NODE_ENV=production
-EXPOSE 3000
+EXPOSE 8105
 
 # Sunucuyu başlat
 CMD ["tsx", "server.ts"]

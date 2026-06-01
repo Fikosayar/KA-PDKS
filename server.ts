@@ -54,7 +54,7 @@ async function sendPushToUser(db: any, userId: string, title: string, body: stri
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT || 8105);
 
   console.log(`Starting PDKS server on port ${PORT}...`);
 

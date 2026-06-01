@@ -5,9 +5,9 @@ services:
     build: .
     container_name: pdks_app
     ports:
-      # Sunucunun localhost'unda 3005 portunu, içerideki 3000 portuna bağlar.
-      # Cloudflare üzerinden http://127.0.0.1:3005 hedefine yönlendirme yapacaksınız.
-      - '127.0.0.1:3005:3000'
+      # Sunucunun localhost'unda 8105 portunu, içerideki 8105 portuna bağlar.
+      # Cloudflare üzerinden http://127.0.0.1:8105 hedefine yönlendirme yapacaksınız.
+      - '127.0.0.1:8105:8105'
     environment:
       # Coolify veya sistem ortamından gelecek değişkenler
       - VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}
@@ -20,7 +20,7 @@ services:
       - VITE_FIREBASE_DATABASE_ID=${VITE_FIREBASE_DATABASE_ID}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8105/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3
