@@ -62,6 +62,7 @@ import {
   ArrowLeft,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Download,
   Save,
   Clock4,
@@ -2139,9 +2140,9 @@ export default function App() {
                     setScanType('out'); setShowScanner(true);
                   }
                 }}
-                className="group relative flex flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl bg-zinc-900 p-8 text-white transition-all hover:bg-zinc-800"
+                className="group relative flex flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl bg-red-600 p-8 text-white transition-all hover:bg-red-500"
               >
-                <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/5 transition-transform group-hover:scale-150" />
+                <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10 transition-transform group-hover:scale-150" />
                 <LogOut size={40} />
                 <span className="text-lg font-bold">Çıkış Yap</span>
                 {profile?.canRemoteCheckIn && <span className="text-[10px] opacity-70 flex items-center gap-1"><Truck size={10} /> Nakliye Yetkili</span>}
@@ -3398,10 +3399,14 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Request Forms */}
               <div className="space-y-6">
-                <section className="rounded-3xl border border-zinc-900 bg-zinc-900/20 p-6 space-y-4">
-                  <h3 className="text-lg font-bold flex items-center gap-2">
-                    <Plus size={20} className="text-emerald-500" /> İzin Talebi Oluştur
-                  </h3>
+                <details className="group rounded-3xl border border-zinc-900 bg-zinc-900/20">
+                  <summary className="p-6 cursor-pointer list-none select-none flex items-center justify-between outline-none">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Plus size={20} className="text-emerald-500" /> İzin Talebi Oluştur
+                    </h3>
+                    <ChevronDown size={20} className="text-zinc-500 transition-transform group-open:-rotate-180" />
+                  </summary>
+                  <div className="px-6 pb-6 pt-0 space-y-4">
                   <form onSubmit={submitLeaveRequest} className="space-y-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-zinc-500 uppercase">Talep Türü</label>
@@ -3416,7 +3421,7 @@ export default function App() {
                       </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-zinc-500 uppercase">Başlangıç</label>
                         <input 
@@ -3495,12 +3500,17 @@ export default function App() {
                       ) : 'Talep Gönder'}
                     </button>
                   </form>
-                </section>
+                  </div>
+                </details>
 
-                <section className="rounded-3xl border border-zinc-900 bg-zinc-900/20 p-6 space-y-4">
-                  <h3 className="text-lg font-bold flex items-center gap-2">
-                    <Plus size={20} className="text-blue-500" /> Fazla Mesai Talebi
-                  </h3>
+                <details className="group rounded-3xl border border-zinc-900 bg-zinc-900/20">
+                  <summary className="p-6 cursor-pointer list-none select-none flex items-center justify-between outline-none">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                      <Plus size={20} className="text-blue-500" /> Fazla Mesai Talebi
+                    </h3>
+                    <ChevronDown size={20} className="text-zinc-500 transition-transform group-open:-rotate-180" />
+                  </summary>
+                  <div className="px-6 pb-6 pt-0 space-y-4">
                   <form onSubmit={submitOvertimeRequest} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-1">
@@ -3549,7 +3559,8 @@ export default function App() {
                     </div>
                     <button className="w-full rounded-xl bg-blue-600 py-3 font-bold text-white hover:bg-blue-500 transition-colors">Talep Gönder</button>
                   </form>
-                </section>
+                  </div>
+                </details>
               </div>
 
             {/* Requests List */}
@@ -4976,7 +4987,7 @@ export default function App() {
                   <Truck size={22} />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-white">Giriş Yöntemi</h3>
+                  <h3 className="font-bold text-white">{pendingScanType === 'in' ? 'Giriş' : 'Çıkış'} Yöntemi</h3>
                   <p className="text-xs text-zinc-500">
                     {pendingScanType === 'in' ? '🟢 Giriş' : '🔴 Çıkış'} işlemi — Bir yöntem seçin
                   </p>
