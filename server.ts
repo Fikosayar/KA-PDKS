@@ -77,9 +77,10 @@ async function startServer() {
   }
 
   // Initialize Firebase Admin SDK (Only for tokens)
+  let adminApp: any = null;
   try {
     const adminId = 'pdks-admin-app';
-    initializeAdminApp({
+    adminApp = initializeAdminApp({
       projectId: firebaseConfig.projectId,
     }, adminId);
     console.log("Firebase Admin SDK (Tokens) initialized.");
@@ -187,7 +188,7 @@ async function startServer() {
       // Generate custom token (May fail if Admin SDK lacks permissions, but is supplementary)
       let customToken = null;
       try {
-        customToken = await getAdminAuth().createCustomToken(userDoc.id);
+        customToken = await getAdminAuth(adminApp).createCustomToken(userDoc.id);
       } catch (authError) {
         console.warn("Could not generate custom token (Role bypass might be needed):", authError);
       }

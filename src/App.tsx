@@ -2525,7 +2525,7 @@ export default function App() {
                           {u.avatarUrl ? (
                             <img src={u.avatarUrl} alt={u.name} className="h-full w-full object-cover" />
                           ) : (
-                            u.name[0]
+                            u.name?.[0]
                           )}
                         </div>
                         <div className="text-left">
@@ -2567,7 +2567,7 @@ export default function App() {
                   <div className="mb-6 flex flex-col md:flex-row md:items-center gap-4">
                     <div className="flex items-center gap-4">
                       <div className="h-12 w-12 rounded-full bg-orange-500 flex items-center justify-center text-white text-xl font-bold shrink-0">
-                        {allUsers.find(u => u.uid === selectedPersonnelId)?.name[0]}
+                        {allUsers.find(u => u.uid === selectedPersonnelId)?.name?.[0]}
                       </div>
                       <div>
                         <h3 className="text-xl font-bold leading-tight">{allUsers.find(u => u.uid === selectedPersonnelId)?.name}</h3>
@@ -3070,7 +3070,7 @@ export default function App() {
                             {u.avatarUrl ? (
                               <img src={u.avatarUrl} alt={u.name} className="h-full w-full object-cover" />
                             ) : (
-                              u.name[0]
+                              u.name?.[0]
                             )}
                           </div>
                           <div className="flex flex-col">
@@ -3122,7 +3122,7 @@ export default function App() {
                         {u.avatarUrl ? (
                           <img src={u.avatarUrl} alt={u.name} className="h-full w-full object-cover" />
                         ) : (
-                          u.name[0]
+                          u.name?.[0]
                         )}
                       </div>
                       <div className="space-y-0.5">
@@ -3914,7 +3914,7 @@ export default function App() {
                       <img src={editingUser.avatarUrl} alt={editingUser.name} className="h-20 w-20 rounded-full object-cover border-4 border-orange-500/30" />
                     ) : (
                       <div className="h-20 w-20 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 text-2xl font-black border-4 border-orange-500/10">
-                        {editingUser.name[0]}
+                        {editingUser.name?.[0]}
                       </div>
                     )}
                     <label className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
@@ -4501,7 +4501,7 @@ export default function App() {
                         dashboardStatModal.color === 'red' ? "bg-red-500/20 text-red-400" :
                         "bg-zinc-800 text-zinc-400"
                       )}>
-                        {p.name[0]?.toUpperCase()}
+                        {p.name?.[0]?.toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-white truncate">{p.name}</p>
