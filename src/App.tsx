@@ -3362,7 +3362,7 @@ export default function App() {
           <section className="space-y-8">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold flex items-center gap-2">
-                <FileText size={28} className="text-orange-500" /> İzin ve Fazla Mesai Yönetimi
+                <FileText size={28} className="text-orange-500" /> Talepler
               </h2>
             </div>
 
