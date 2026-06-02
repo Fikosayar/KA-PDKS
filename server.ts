@@ -425,9 +425,14 @@ async function startServer() {
       const typeText = type === 'in' ? 'Giriş' : 'Çıkış';
       const remoteText = isRemote ? ' (Nakliye/Uzaktan)' : '';
       const title = `${userName} - ${typeText} Hareketi${remoteText}`;
-      const body = isRemote && remoteNote 
+      let body = isRemote && remoteNote 
         ? `Not: ${remoteNote}` 
         : `${new Date().toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' })} saatinde ${typeText.toLowerCase()} yaptı.`;
+      
+      if (req.body.location) {
+        body += `\n📍 Konum: https://www.google.com/maps?q=${req.body.location.latitude},${req.body.location.longitude}`;
+      }
+
       const link = isRemote ? '/approvals' : '/movements';
 
       await sendPushToUser(db, managerId, title, body, link);

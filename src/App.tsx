@@ -1061,7 +1061,7 @@ export default function App() {
       let location = undefined;
       try {
         const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
         });
         location = {
           latitude: pos.coords.latitude,
@@ -1079,9 +1079,9 @@ export default function App() {
         const shiftStartDate = new Date();
         shiftStartDate.setHours(startHour, startMin, 0, 0);
 
-        const diffMinutes = (checkInTime.getTime() - shiftStartDate.getTime()) / 60000;
+        const diffMinutes = Math.floor((checkInTime.getTime() - shiftStartDate.getTime()) / 60000);
 
-        if (diffMinutes > 0 && diffMinutes <= settings.toleranceMinutes) {
+        if (diffMinutes >= 0 && diffMinutes <= settings.toleranceMinutes) {
           checkInTime = shiftStartDate;
           toleranceMessage = 'Tolerans sağlandı ve giriş işleminiz normal giriş saatine çekildi.';
         } else if (diffMinutes > settings.toleranceMinutes) {
@@ -1142,7 +1142,8 @@ export default function App() {
             userName: profile.name,
             type: scanType,
             isRemote: !!isRemote,
-            remoteNote: remoteNote || ''
+            remoteNote: remoteNote || '',
+            location: location || null
           })
         }).catch(() => {});
 
@@ -1405,7 +1406,7 @@ export default function App() {
           fetch('/api/notify/checkin', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.uid, userName: profile.name, type: manualLogType, isRemote: true, remoteNote: 'Geçmiş Manuel Kayıt Eklendi' })
+            body: JSON.stringify({ userId: user.uid, userName: profile.name, type: manualLogType, isRemote: true, remoteNote: 'Geçmiş Manuel Kayıt Eklendi', location: location || null })
           }).catch(() => {});
         }
       }
@@ -5172,7 +5173,7 @@ export default function App() {
                       <QrCode size={22} />
                     </div>
                     <div>
-                      <p className="font-bold text-white text-sm">QR Kod ile Giriş</p>
+                      <p className="font-bold text-white text-sm">QR Kod ile {pendingScanType === 'in' ? 'Giriş' : 'Çıkış'}</p>
                       <p className="text-xs text-zinc-500 mt-0.5">İş yerindeki QR kodu kameraya okutun</p>
                     </div>
                     <ChevronRight size={18} className="ml-auto text-zinc-600" />
@@ -5190,7 +5191,7 @@ export default function App() {
                       <Clock size={22} />
                     </div>
                     <div>
-                      <p className="font-bold text-white text-sm">Manuel Giriş</p>
+                      <p className="font-bold text-white text-sm">Manuel {pendingScanType === 'in' ? 'Giriş' : 'Çıkış'}</p>
                       <p className="text-xs text-zinc-500 mt-0.5">Saati kendiniz girin (nakliye, saha çalışması)</p>
                     </div>
                     <ChevronRight size={18} className="ml-auto text-zinc-600" />
@@ -5253,9 +5254,9 @@ export default function App() {
                             const shiftStartDate = new Date();
                             shiftStartDate.setHours(startHour, startMin, 0, 0);
 
-                            const diffMinutes = (clientNow.getTime() - shiftStartDate.getTime()) / 60000;
+                            const diffMinutes = Math.floor((clientNow.getTime() - shiftStartDate.getTime()) / 60000);
 
-                            if (diffMinutes > 0 && diffMinutes <= settings.toleranceMinutes) {
+                            if (diffMinutes >= 0 && diffMinutes <= settings.toleranceMinutes) {
                               clientNow = shiftStartDate;
                               toleranceMessage = 'Tolerans sağlandı ve giriş saati normale çekildi. ';
                             } else if (diffMinutes > settings.toleranceMinutes) {
@@ -5267,7 +5268,7 @@ export default function App() {
                           let location = undefined;
                           try {
                             const pos = await new Promise<GeolocationPosition>((res, rej) => {
-                              navigator.geolocation.getCurrentPosition(res, rej, { timeout: 4000 });
+                              navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
                             });
                             location = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
                           } catch {}
@@ -5301,7 +5302,7 @@ export default function App() {
                           fetch('/api/notify/checkin', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userId: user.uid, userName: profile.name, type: pendingScanType, isRemote: true, remoteNote: remoteNote || '' })
+                            body: JSON.stringify({ userId: user.uid, userName: profile.name, type: pendingScanType, isRemote: true, remoteNote: remoteNote || '', location: location || null })
                           }).catch(() => {});
 
                           setStatus({ type: 'success', message: `${toleranceMessage}🚛 Manuel ${pendingScanType === 'in' ? 'giriş' : 'çıkış'} talebi alındı. Yönetici onayından sonra kesinleşecek.` });
