@@ -101,6 +101,7 @@ export interface GlobalSettings {
   companyName?: string;
   workDaysPerWeek?: number;
   roundingThresholdMinutes?: number;
+  toleranceMinutes?: number; // Giriş tolerans süresi (dakika)
   shiftStart?: string;
   shiftEnd?: string;
   breakRules?: {

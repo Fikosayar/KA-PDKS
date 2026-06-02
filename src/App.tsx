@@ -186,6 +186,16 @@ export default function App() {
   // Talepler sekmesi için geçmiş taleplerin ay filtresi
   const [requestMonth, setRequestMonth] = useState(format(new Date(), 'yyyy-MM'));
 
+  // Otomatik kapanan bildirimler (4 saniye)
+  useEffect(() => {
+    if (status) {
+      const timer = setTimeout(() => {
+        setStatus(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [status]);
+
 
   const getEffectiveLeaveBalance = (u: UserProfile | null) => {
     if (!u) return 0;
@@ -1061,6 +1071,24 @@ export default function App() {
         console.warn("Geolocation denied or failed");
       }
 
+      let checkInTime = new Date();
+      let toleranceMessage = '';
+
+      if (scanType === 'in' && settings.shiftStart && settings.toleranceMinutes) {
+        const [startHour, startMin] = settings.shiftStart.split(':').map(Number);
+        const shiftStartDate = new Date();
+        shiftStartDate.setHours(startHour, startMin, 0, 0);
+
+        const diffMinutes = (checkInTime.getTime() - shiftStartDate.getTime()) / 60000;
+
+        if (diffMinutes > 0 && diffMinutes <= settings.toleranceMinutes) {
+          checkInTime = shiftStartDate;
+          toleranceMessage = 'Tolerans sağlandı ve giriş işleminiz normal giriş saatine çekildi.';
+        } else if (diffMinutes > settings.toleranceMinutes) {
+          toleranceMessage = 'Geç kaldınız.';
+        }
+      }
+
       const logPayload: any = {
         userId: user.uid,
         userName: profile.name,
@@ -1077,26 +1105,26 @@ export default function App() {
         const queueItem: OfflineQueueItem = {
           id: `offline-${Date.now()}-${Math.random().toString(36).substring(2)}`,
           type: 'attendance',
-          payload: { ...logPayload, clientTimestamp: new Date().toISOString() },
+          payload: { ...logPayload, clientTimestamp: checkInTime.toISOString() },
           createdAt: new Date().toISOString()
         };
         await addToOfflineQueue(queueItem);
         const newCount = (await getOfflineQueue()).length;
         setOfflineQueueCount(newCount);
-        setStatus({ type: 'success', message: `📵 İnternetsiz mod: ${scanType === 'in' ? 'Giriş' : 'Çıkış'} kaydedildi, internet gelince senkronize edilecek.` });
+        setStatus({ type: 'success', message: `📵 İnternetsiz mod: ${scanType === 'in' ? 'Giriş' : 'Çıkış'} kaydedildi. ${toleranceMessage}` });
       } else {
         const clientNow = new Date();
         // Firestore'a yaz
         const newDocRef = await addDoc(collection(db, 'attendance'), {
           ...logPayload,
-          timestamp: serverTimestamp(),
+          timestamp: checkInTime,
         });
 
         // OPTİMİSTİK UI: Snapshot beklemeden anında state'e ekle
         const optimisticLog: AttendanceLog = {
           id: newDocRef.id,
           ...logPayload,
-          timestamp: { toDate: () => clientNow } as any,
+          timestamp: { toDate: () => checkInTime } as any,
         };
         setLogs(prev => [optimisticLog, ...prev.filter(l => l.id !== newDocRef.id)]);
 
@@ -1118,7 +1146,7 @@ export default function App() {
           })
         }).catch(() => {});
 
-        setStatus({ type: 'success', message: `${isRemote ? '🚛 Nakliye: ' : ''}${scanType === 'in' ? 'Giriş' : 'Çıkış'} işleminiz başarıyla kaydedildi.` });
+        setStatus({ type: 'success', message: `${isRemote ? '🚛 Nakliye: ' : ''}${scanType === 'in' ? 'Giriş' : 'Çıkış'} işleminiz başarıyla kaydedildi. ${toleranceMessage}`.trim() });
       }
 
 
@@ -1160,6 +1188,7 @@ export default function App() {
       companyName: formData.get('companyName') as string,
       workDaysPerWeek: parseInt(formData.get('workDaysPerWeek') as string) || 6,
       roundingThresholdMinutes: parseInt(formData.get('roundingThresholdMinutes') as string) || 30,
+      toleranceMinutes: parseInt(formData.get('toleranceMinutes') as string) || 0,
       shiftStart: formData.get('shiftStart') as string || '09:00',
       shiftEnd: formData.get('shiftEnd') as string || '18:00',
       breakRules: breakRules,
@@ -3251,6 +3280,16 @@ export default function App() {
                             className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none"
                           />
                         </div>
+                        <div className="space-y-2">
+                          <label className="text-xs font-semibold text-zinc-500 uppercase">Giriş Tolerans Süresi (Dakika)</label>
+                          <input 
+                            name="toleranceMinutes"
+                            type="number"
+                            defaultValue={settings?.toleranceMinutes || 0}
+                            className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none"
+                            placeholder="Geç kalınabilecek maks. süre"
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -5205,8 +5244,24 @@ export default function App() {
                         try {
                           // Saat bilgisini bugüne uygula
                           const [h, m] = remoteManualTime.split(':').map(Number);
-                          const clientNow = new Date();
+                          let clientNow = new Date();
                           clientNow.setHours(h, m, 0, 0);
+
+                          let toleranceMessage = '';
+                          if (pendingScanType === 'in' && settings?.shiftStart && settings?.toleranceMinutes) {
+                            const [startHour, startMin] = settings.shiftStart.split(':').map(Number);
+                            const shiftStartDate = new Date();
+                            shiftStartDate.setHours(startHour, startMin, 0, 0);
+
+                            const diffMinutes = (clientNow.getTime() - shiftStartDate.getTime()) / 60000;
+
+                            if (diffMinutes > 0 && diffMinutes <= settings.toleranceMinutes) {
+                              clientNow = shiftStartDate;
+                              toleranceMessage = 'Tolerans sağlandı ve giriş saati normale çekildi. ';
+                            } else if (diffMinutes > settings.toleranceMinutes) {
+                              toleranceMessage = 'Geç kaldınız. ';
+                            }
+                          }
 
                           // GPS konum al
                           let location = undefined;
@@ -5249,7 +5304,7 @@ export default function App() {
                             body: JSON.stringify({ userId: user.uid, userName: profile.name, type: pendingScanType, isRemote: true, remoteNote: remoteNote || '' })
                           }).catch(() => {});
 
-                          setStatus({ type: 'success', message: `🚛 Manuel ${pendingScanType === 'in' ? 'giriş' : 'çıkış'} talebi alındı. Yönetici onayından sonra kesinleşecek.` });
+                          setStatus({ type: 'success', message: `${toleranceMessage}🚛 Manuel ${pendingScanType === 'in' ? 'giriş' : 'çıkış'} talebi alındı. Yönetici onayından sonra kesinleşecek.` });
                           setShowRemoteModal(false);
                           setRemoteManualMode(false);
                           setRemoteNote('');
