@@ -183,6 +183,8 @@ export default function App() {
   // Push bildirim durumu
   const [pushEnabled, setPushEnabled] = useState(false);
 
+  // Talepler sekmesi için geçmiş taleplerin ay filtresi
+  const [requestMonth, setRequestMonth] = useState(format(new Date(), 'yyyy-MM'));
 
 
   const getEffectiveLeaveBalance = (u: UserProfile | null) => {
@@ -1659,6 +1661,8 @@ export default function App() {
       await setDoc(requestRef, { 
         ...requestData, 
         status: finalStatus,
+        approvedBy: profile?.name || 'Yönetici',
+        approvedAt: serverTimestamp(),
       });
 
       // Push bildirimi gönder (arka planda, hata olsa bile devam)
@@ -3569,59 +3573,168 @@ export default function App() {
 
             {/* Requests List */}
             <div className="space-y-6">
+              {/* Bekleyen Taleplerim */}
               <section className="space-y-4">
-                <h3 className="text-lg font-bold">İzin Taleplerim</h3>
+                <h3 className="text-lg font-bold">Bekleyen Taleplerim</h3>
                 <div className="space-y-3">
-                      {leaveRequests.filter(r => r.userId === user.uid).map(req => (
-                    <div key={req.id} className="rounded-2xl border border-zinc-900 bg-zinc-900/10 p-4 space-y-3 group relative">
+                  {leaveRequests.filter(r => r.userId === user.uid && r.status === 'pending').map(req => (
+                    <div key={req.id} className="rounded-2xl border border-orange-900/30 bg-orange-500/5 p-4 space-y-3 group relative">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-bold text-sm">{req.userName}</p>
-                          <p className="text-[10px] text-zinc-500">{format(new Date(req.startDate), 'd MMM')} - {format(new Date(req.endDate), 'd MMM yyyy')}</p>
+                          <p className="font-bold text-sm">{req.type === 'annual' ? 'Yıllık İzin' : req.type === 'excuse' ? 'Mazeret İzni' : 'Rapor'}</p>
+                          <p className="text-[10px] text-zinc-400">{format(new Date(req.startDate), 'd MMM')} - {format(new Date(req.endDate), 'd MMM yyyy')}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          {profile?.role === 'admin' && (
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => setEditingLeave(req)} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-orange-500"><Edit size={14}/></button>
-                              <button onClick={() => setDeletingLeave(req)} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-red-500"><Trash2 size={14}/></button>
-                            </div>
-                          )}
-                          <div className={cn(
-                            "rounded-full px-2 py-1 text-[10px] font-bold uppercase",
-                            req.status === 'pending' ? "bg-orange-500/10 text-orange-500" :
-                            req.status === 'approved' ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
-                          )}>
-                            {req.status === 'pending' ? 'Bekliyor' : req.status === 'approved' ? 'Onaylandı' : 'Reddedildi'}
+                          <div className="rounded-full px-2 py-1 text-[10px] font-bold uppercase bg-orange-500/10 text-orange-500">
+                            Bekliyor
                           </div>
                         </div>
                       </div>
                       <p className="text-xs text-zinc-400 italic">"{req.reason}"</p>
                     </div>
                   ))}
-                </div>
-              </section>
-
-              <section className="space-y-4">
-                <h3 className="text-lg font-bold">Fazla Mesai Taleplerim</h3>
-                <div className="space-y-3">
-                  {overtimeRequests.filter(r => r.userId === user.uid).map(req => (
-                    <div key={req.id} className="rounded-2xl border border-zinc-900 bg-zinc-900/10 p-4 space-y-3">
+                  
+                  {overtimeRequests.filter(r => r.userId === user.uid && r.status === 'pending').map(req => (
+                    <div key={req.id} className="rounded-2xl border border-orange-900/30 bg-orange-500/5 p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-bold text-sm">{req.userName}</p>
-                          <p className="text-[10px] text-zinc-500">{format(new Date(req.date), 'd MMMM yyyy')} • {req.hours} Saat</p>
+                          <p className="font-bold text-sm">Fazla Mesai</p>
+                          <p className="text-[10px] text-zinc-400">{format(new Date(req.date), 'd MMMM yyyy')} • {req.hours} Saat</p>
                         </div>
-                        <div className={cn(
-                          "rounded-full px-2 py-1 text-[10px] font-bold uppercase",
-                          req.status === 'pending' ? "bg-orange-500/10 text-orange-500" :
-                          req.status === 'approved' ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
-                        )}>
-                          {req.status === 'pending' ? 'Bekliyor' : req.status === 'approved' ? 'Onaylandı' : 'Reddedildi'}
+                        <div className="rounded-full px-2 py-1 text-[10px] font-bold uppercase bg-orange-500/10 text-orange-500">
+                          Bekliyor
                         </div>
                       </div>
                       <p className="text-xs text-zinc-400 italic">"{req.description}"</p>
                     </div>
                   ))}
+
+                  {leaveRequests.filter(r => r.userId === user.uid && r.status === 'pending').length === 0 && 
+                   overtimeRequests.filter(r => r.userId === user.uid && r.status === 'pending').length === 0 && (
+                    <p className="text-xs text-zinc-500 text-center py-4">Bekleyen talebiniz bulunmuyor.</p>
+                  )}
+                </div>
+              </section>
+
+              {/* Geçmiş Talepler */}
+              <section className="space-y-4 pt-4 border-t border-zinc-900">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-bold">Geçmiş Talepler</h3>
+                  <input 
+                    type="month" 
+                    value={requestMonth}
+                    onChange={(e) => setRequestMonth(e.target.value)}
+                    className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm focus:border-orange-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-3">
+                  {(() => {
+                    const mySubordinateIds = allUsers.filter(u => u.managerId === user?.uid).map(u => u.uid);
+                    const hasSubordinates = mySubordinateIds.length > 0 || profile?.role === 'admin';
+                    
+                    const pastLeaves = leaveRequests.filter(r => 
+                      r.status !== 'pending' && 
+                      (r.userId === user.uid || (hasSubordinates && (mySubordinateIds.includes(r.userId) || profile?.role === 'admin'))) &&
+                      r.startDate.startsWith(requestMonth)
+                    );
+                    
+                    const pastOvertimes = overtimeRequests.filter(r =>
+                      r.status !== 'pending' &&
+                      (r.userId === user.uid || (hasSubordinates && (mySubordinateIds.includes(r.userId) || profile?.role === 'admin'))) &&
+                      r.date.startsWith(requestMonth)
+                    );
+                    
+                    const pastLogs = logs.filter(l => 
+                      (l.manualEntry === true || l.isRemote === true) && 
+                      l.status !== 'pending' &&
+                      (l.userId === user.uid || (hasSubordinates && (mySubordinateIds.includes(l.userId) || profile?.role === 'admin'))) &&
+                      format(l.timestamp instanceof Date ? l.timestamp : new Date(l.timestamp?.toDate?.() || l.timestamp), 'yyyy-MM') === requestMonth
+                    );
+
+                    const totalPast = pastLeaves.length + pastOvertimes.length + pastLogs.length;
+
+                    if (totalPast === 0) return <p className="text-xs text-zinc-500 text-center py-4">Bu aya ait geçmiş talep bulunmuyor.</p>;
+
+                    return (
+                      <>
+                        {pastLeaves.map(req => (
+                          <div key={req.id} className="rounded-2xl border border-zinc-900 bg-zinc-900/10 p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-bold text-sm">{req.userId !== user.uid ? `${req.userName} - İzin` : (req.type === 'annual' ? 'Yıllık İzin' : req.type === 'excuse' ? 'Mazeret İzni' : 'Rapor')}</p>
+                                <p className="text-[10px] text-zinc-500">{format(new Date(req.startDate), 'd MMM')} - {format(new Date(req.endDate), 'd MMM yyyy')}</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <div className={cn(
+                                  "rounded-full px-2 py-1 text-[10px] font-bold uppercase",
+                                  req.status === 'approved' ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+                                )}>
+                                  {req.status === 'approved' ? 'Onaylandı' : 'Reddedildi'}
+                                </div>
+                                {req.approvedBy && <span className="text-[9px] text-zinc-500">Onaylayan: {req.approvedBy}</span>}
+                              </div>
+                            </div>
+                            <p className="text-xs text-zinc-400 italic">"{req.reason}"</p>
+                          </div>
+                        ))}
+
+                        {pastOvertimes.map(req => (
+                          <div key={req.id} className="rounded-2xl border border-zinc-900 bg-zinc-900/10 p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-bold text-sm">{req.userId !== user.uid ? `${req.userName} - Fazla Mesai` : 'Fazla Mesai'}</p>
+                                <p className="text-[10px] text-zinc-500">{format(new Date(req.date), 'd MMMM yyyy')} • {req.hours} Saat</p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <div className={cn(
+                                  "rounded-full px-2 py-1 text-[10px] font-bold uppercase",
+                                  req.status === 'approved' ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+                                )}>
+                                  {req.status === 'approved' ? 'Onaylandı' : 'Reddedildi'}
+                                </div>
+                                {req.approvedBy && <span className="text-[9px] text-zinc-500">Onaylayan: {req.approvedBy}</span>}
+                              </div>
+                            </div>
+                            <p className="text-xs text-zinc-400 italic">"{req.description}"</p>
+                          </div>
+                        ))}
+
+                        {pastLogs.map(log => {
+                          const logTime = log.timestamp instanceof Date ? log.timestamp : new Date(log.timestamp?.toDate?.() || log.timestamp);
+                          return (
+                            <div key={log.id} className="rounded-2xl border border-zinc-900 bg-zinc-900/10 p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-bold text-sm">{log.userId !== user.uid ? `${log.userName} - ${log.type === 'in' ? 'Giriş' : 'Çıkış'}` : `${log.type === 'in' ? 'Giriş' : 'Çıkış'} (Manuel)`}</p>
+                                  <p className="text-[10px] text-zinc-500">{format(logTime, 'd MMMM yyyy HH:mm')}</p>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  <div className={cn(
+                                    "rounded-full px-2 py-1 text-[10px] font-bold uppercase",
+                                    log.status === 'success' ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+                                  )}>
+                                    {log.status === 'success' ? 'Onaylandı' : 'Reddedildi'}
+                                  </div>
+                                  {log.approvedBy && <span className="text-[9px] text-zinc-500">Onaylayan: {log.approvedBy}</span>}
+                                </div>
+                              </div>
+                              {log.remoteNote && <p className="text-xs text-zinc-400 italic">"{log.remoteNote}"</p>}
+                              {log.location && (
+                                <a 
+                                  href={`https://maps.google.com/?q=${log.location.latitude},${log.location.longitude}`} 
+                                  target="_blank" 
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] text-blue-500 hover:underline"
+                                >
+                                  <MapPin size={10} /> Konumu Göster
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
                 </div>
               </section>
             </div>

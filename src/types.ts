@@ -54,6 +54,8 @@ export interface LeaveRequest {
   deleted?: boolean;
   deleteReason?: string;
   deletedBy?: string;
+  approvedBy?: string;
+  approvedAt?: any;
 }
 
 export interface OvertimeRequest {
@@ -67,6 +69,8 @@ export interface OvertimeRequest {
   status: 'pending' | 'approved' | 'rejected';
   createdAt: any;
   deleted?: boolean;
+  approvedBy?: string;
+  approvedAt?: any;
 }
 
 export interface AttendanceLog {
@@ -87,6 +91,8 @@ export interface AttendanceLog {
   remoteNote?: string; // Personelin nakliye notu/mazereti
   deleted?: boolean;
   offlineQueued?: boolean; // Çevrimdışı kuyruğundan gönderildi
+  approvedBy?: string;
+  approvedAt?: any;
 }
 
 export interface GlobalSettings {
