@@ -2173,10 +2173,19 @@ export default function App() {
             {!isOnline && (
               <div className="flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
                 <WifiOff size={18} className="text-amber-400 shrink-0" />
-                <div>
+                <div className="flex-1">
                   <p className="text-sm font-bold text-amber-400">Çevrimdışı Mod</p>
                   <p className="text-xs text-amber-400/70">İnternet yok. Hareketler cihazınıza kaydedilecek, bağlantı gelince otomatik gönderilecek.</p>
                 </div>
+                <button
+                  onClick={() => window.location.reload()}
+                  className="flex items-center justify-center h-8 w-8 rounded-xl bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 active:scale-95 transition-all shrink-0"
+                  title="Yenile"
+                >
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
               </div>
             )}
             {offlineQueueCount > 0 && isOnline && (
