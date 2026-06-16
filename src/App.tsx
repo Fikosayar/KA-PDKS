@@ -93,6 +93,7 @@ import * as XLSX from 'xlsx';
 import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { getStoredTheme, setStoredTheme, applyTheme, listenSystemTheme, getEffectiveTheme, type Theme } from './lib/theme';
 import { getHoliday } from './lib/holidays';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 
 function dataURItoBlob(dataURI: string) {
   const byteString = atob(dataURI.split(',')[1]);
@@ -182,6 +183,9 @@ export default function App() {
 
   // Push bildirim durumu
   const [pushEnabled, setPushEnabled] = useState(false);
+
+  // PWA Güncelleme
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
 
   // PWA Kurulum prompt'u (Android/Desktop)
   const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
@@ -5414,6 +5418,50 @@ export default function App() {
       </main>
 
 
+
+      {/* === PWA GÜNCELLEME BANNER'I === */}
+      <AnimatePresence>
+        {needRefresh && (
+          <motion.div
+            initial={{ opacity: 0, y: 80 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 80 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="fixed bottom-20 left-4 right-4 md:left-auto md:right-6 md:w-96 z-50"
+          >
+            <div className="rounded-2xl border border-blue-500/40 bg-zinc-900 shadow-2xl shadow-black/60 overflow-hidden">
+              <div className="p-4 flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-400">
+                  {/* Güncelleme ikonu */}
+                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-white text-sm">Yeni Güncelleme Mevcut 🎉</p>
+                  <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+                    Yeni bir sürüm hazır. Güncellemek için aşağıdaki butona basın.
+                  </p>
+                </div>
+              </div>
+              <div className="px-4 pb-4 flex gap-2">
+                <button
+                  onClick={() => updateServiceWorker(false)}
+                  className="flex-1 rounded-xl border border-zinc-700 py-2.5 text-sm font-bold text-zinc-400 hover:bg-zinc-800 transition"
+                >
+                  Daha Sonra
+                </button>
+                <button
+                  onClick={() => updateServiceWorker(true)}
+                  className="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-bold text-white hover:bg-blue-500 transition shadow-lg shadow-blue-500/20"
+                >
+                  🔄 Güncelle
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* === PWA KURULUM BANNER'I (Android / Desktop) === */}
       <AnimatePresence>
