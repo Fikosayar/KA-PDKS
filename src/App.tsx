@@ -2289,9 +2289,20 @@ export default function App() {
             {/* Info Cards */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="rounded-2xl border theme-border theme-bg-secondary p-4">
-                <div className="mb-2 flex items-center gap-2 text-zinc-500">
-                  {isOnline ? <Wifi size={16} /> : <WifiOff size={16} className="text-amber-400" />}
-                  <span className="text-xs font-semibold uppercase tracking-wider">Ağ Durumu</span>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-zinc-500">
+                    {isOnline ? <Wifi size={16} /> : <WifiOff size={16} className="text-amber-400" />}
+                    <span className="text-xs font-semibold uppercase tracking-wider">Ağ Durumu</span>
+                  </div>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="flex items-center justify-center h-7 w-7 rounded-lg bg-zinc-800 text-zinc-400 hover:bg-orange-500/20 hover:text-orange-400 active:scale-95 transition-all"
+                    title="Sayfayı Yenile"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
                 </div>
                 <p className="text-sm font-medium theme-text">{isOnline ? (currentIp || 'Tespit ediliyor...') : 'Çevrimdışı'}</p>
                 <p className="text-[10px] text-zinc-600">Mevcut IP Adresiniz</p>
