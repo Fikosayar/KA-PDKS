@@ -183,6 +183,12 @@ export default function App() {
   // Push bildirim durumu
   const [pushEnabled, setPushEnabled] = useState(false);
 
+  // PWA Kurulum prompt'u (Android/Desktop)
+  const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  // iOS Safari yönlendirme prompt'u
+  const [showIosInstallGuide, setShowIosInstallGuide] = useState(false);
+
   // Talepler sekmesi için geçmiş taleplerin ay filtresi
   const [requestMonth, setRequestMonth] = useState(format(new Date(), 'yyyy-MM'));
 
@@ -195,6 +201,37 @@ export default function App() {
       return () => clearTimeout(timer);
     }
   }, [status]);
+
+  // PWA Kurulum algılama
+  useEffect(() => {
+    // Uygulama zaten standalone (kurulu) olarak çalışıyorsa gösterme
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || (window.navigator as any).standalone === true;
+    if (isStandalone) return;
+
+    // iOS Safari algılama
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const isSafari = /safari/i.test(navigator.userAgent) && !/chrome/i.test(navigator.userAgent);
+    if (isIos && isSafari) {
+      const dismissed = localStorage.getItem('pwa-ios-dismissed');
+      if (!dismissed) {
+        // 3 saniye gecikme ile göster (kullanıcı sayfaya baksın)
+        const t = setTimeout(() => setShowIosInstallGuide(true), 3000);
+        return () => clearTimeout(t);
+      }
+      return;
+    }
+
+    // Android / Desktop - beforeinstallprompt
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setInstallPromptEvent(e);
+      const dismissed = localStorage.getItem('pwa-install-dismissed');
+      if (!dismissed) setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
 
 
   const getEffectiveLeaveBalance = (u: UserProfile | null) => {
@@ -5377,6 +5414,157 @@ export default function App() {
       </main>
 
 
+
+      {/* === PWA KURULUM BANNER'I (Android / Desktop) === */}
+      <AnimatePresence>
+        {showInstallBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: 80 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 80 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="fixed bottom-20 left-4 right-4 md:left-auto md:right-6 md:w-96 z-50"
+          >
+            <div className="rounded-2xl border border-orange-500/30 bg-zinc-900 shadow-2xl shadow-black/60 overflow-hidden">
+              <div className="p-4 flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
+                  <img src="/logo192.png" alt="PDKS" className="h-10 w-10 rounded-lg object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-white text-sm">Uygulamayı Yükle</p>
+                  <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+                    PDKS'yi ana ekranınıza ekleyin. İnternet olmadan bile çalışır!
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowInstallBanner(false);
+                    localStorage.setItem('pwa-install-dismissed', '1');
+                  }}
+                  className="text-zinc-600 hover:text-white transition-colors p-1 shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="px-4 pb-4 flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowInstallBanner(false);
+                    localStorage.setItem('pwa-install-dismissed', '1');
+                  }}
+                  className="flex-1 rounded-xl border border-zinc-700 py-2.5 text-sm font-bold text-zinc-400 hover:bg-zinc-800 transition"
+                >
+                  Daha Sonra
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!installPromptEvent) return;
+                    installPromptEvent.prompt();
+                    const { outcome } = await installPromptEvent.userChoice;
+                    if (outcome === 'accepted') {
+                      setShowInstallBanner(false);
+                      setInstallPromptEvent(null);
+                    }
+                  }}
+                  className="flex-1 rounded-xl bg-orange-500 py-2.5 text-sm font-bold text-white hover:bg-orange-600 transition shadow-lg shadow-orange-500/20"
+                >
+                  Ana Ekrana Ekle
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* === PWA KURULUM KILAVUZU (iOS / Safari) === */}
+      <AnimatePresence>
+        {showIosInstallGuide && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) { setShowIosInstallGuide(false); localStorage.setItem('pwa-ios-dismissed', '1'); } }}
+          >
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="w-full max-w-sm rounded-3xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-2xl"
+            >
+              {/* Başlık */}
+              <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <img src="/logo192.png" alt="PDKS" className="h-10 w-10 rounded-xl object-cover" />
+                  <div>
+                    <p className="font-bold text-white text-sm">PDKS'yi Ana Ekrana Ekle</p>
+                    <p className="text-xs text-zinc-500">Uygulama gibi kullanın</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setShowIosInstallGuide(false); localStorage.setItem('pwa-ios-dismissed', '1'); }}
+                  className="text-zinc-600 hover:text-white transition p-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Adımlar */}
+              <div className="p-5 space-y-4">
+                {/* Adım 1 */}
+                <div className="flex items-start gap-3">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-black">1</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-white">Paylaş butonuna dokunun</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Safari'nin alt çubuğundaki</p>
+                    {/* Paylaş ikonu simülasyonu */}
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-1.5">
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 text-blue-400" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span className="text-xs text-blue-400 font-semibold">Paylaş</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Adım 2 */}
+                <div className="flex items-start gap-3">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-black">2</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-white">Aşağı kaydırın</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Açılan menüde aşağı kaydırın ve şunu bulun:</p>
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-1.5">
+                      <svg viewBox="0 0 24 24" className="h-4 w-4 text-zinc-300" fill="none" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span className="text-xs text-zinc-300 font-semibold">Ana Ekrana Ekle</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Adım 3 */}
+                <div className="flex items-start gap-3">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white text-xs font-black">3</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-white">"Ekle"ye dokunun</p>
+                    <p className="text-xs text-zinc-400 mt-0.5">Sağ üst köşedeki "Ekle" butonuna basın. Hazır!</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-5 pb-5">
+                <button
+                  onClick={() => { setShowIosInstallGuide(false); localStorage.setItem('pwa-ios-dismissed', '1'); }}
+                  className="w-full rounded-xl bg-zinc-800 py-3 text-sm font-bold text-zinc-400 hover:bg-zinc-700 transition"
+                >
+                  Anladım, Daha Sonra
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Bottom Nav */}
       <BottomNav
