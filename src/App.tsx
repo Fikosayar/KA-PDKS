@@ -249,20 +249,27 @@ export default function App() {
   useEffect(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
       || (window.navigator as any).standalone === true;
-    if (!isStandalone) return; // Tarayıcıda açıksa hiç gösterme
+    if (!isStandalone) return;
 
     const storedLogoVersion = localStorage.getItem('pwa-logo-version');
-    if (storedLogoVersion !== LOGO_VERSION) {
-      // Sürüm farklı veya hiç kaydedilmemiş: rehberi göster
-      // Not: ilk kez kurulumda da gelmesin diye 'pwa-logo-version' yoksa kaydet sadece
-      if (storedLogoVersion === null) {
-        // İlk kurulum - mevcut versiyonü kaydet, modal gösterme
-        localStorage.setItem('pwa-logo-version', LOGO_VERSION);
-      } else {
-        // Eski versiyon var, yeni versiyon farklı - rehber göster
-        setShowIconReinstallGuide(true);
-      }
+    if (storedLogoVersion === LOGO_VERSION) return; // Kullanıcı bu versiyon için onayladı
+
+    if (storedLogoVersion === null) {
+      // İlk kurulum - mevcut versiyonü kaydet, modal gösterme
+      localStorage.setItem('pwa-logo-version', LOGO_VERSION);
+      return;
     }
+
+    // Eski versiyon var - snooze süresi doldu mu kontrol et
+    const snoozeUntil = localStorage.getItem('pwa-logo-snooze-until');
+    if (snoozeUntil) {
+      const snoozeDate = new Date(snoozeUntil);
+      if (new Date() < snoozeDate) return; // Snooze süresi henüz dolmadı
+      // Süre doldu, snooze'u temizle ve tekrar göster
+      localStorage.removeItem('pwa-logo-snooze-until');
+    }
+
+    setShowIconReinstallGuide(true);
   }, [LOGO_VERSION]);
 
   const getEffectiveLeaveBalance = (u: UserProfile | null) => {
@@ -5609,16 +5616,30 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Alt buton */}
-                <div className="px-5 pb-5">
+                {/* Alt butonlar */}
+                <div className="px-5 pb-5 flex flex-col gap-2">
+                  {/* Kalıcı kabul - bir daha çıkmaz */}
                   <button
                     onClick={() => {
                       localStorage.setItem('pwa-logo-version', LOGO_VERSION);
+                      localStorage.removeItem('pwa-logo-snooze-until');
+                      setShowIconReinstallGuide(false);
+                    }}
+                    className="w-full rounded-xl bg-orange-500 py-3 text-sm font-bold text-white hover:bg-orange-600 transition"
+                  >
+                    Anladım, Yapacağım ✓
+                  </button>
+                  {/* 2 gün ertele */}
+                  <button
+                    onClick={() => {
+                      const snoozeDate = new Date();
+                      snoozeDate.setDate(snoozeDate.getDate() + 2);
+                      localStorage.setItem('pwa-logo-snooze-until', snoozeDate.toISOString());
                       setShowIconReinstallGuide(false);
                     }}
                     className="w-full rounded-xl bg-zinc-800 py-3 text-sm font-bold text-zinc-400 hover:bg-zinc-700 transition"
                   >
-                    Daha Sonra Hatırlat
+                    Daha Sonra Hatırlat (2 gün)
                   </button>
                 </div>
               </motion.div>
