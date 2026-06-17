@@ -957,6 +957,7 @@ export default function App() {
     const allowedDevice = formData.get('allowedDevice') as string;
     const deviceId = formData.get('deviceId') as string;
     const canRemoteCheckIn = formData.get('canRemoteCheckIn') === 'true';
+    const rfidTag = (formData.get('rfidTag') as string || '').trim().toUpperCase();
 
     try {
       const response = await fetch('/api/users', {
@@ -964,7 +965,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           adminUid: profile.uid,
-          newUser: { name, title, personnelId, password, role, managerId, leaveBalance, startDate, birthDate, allowedDevice, deviceId, canRemoteCheckIn }
+          newUser: { name, title, personnelId, password, role, managerId, leaveBalance, startDate, birthDate, allowedDevice, deviceId, canRemoteCheckIn, rfidTag: rfidTag || null }
         })
       });
 
@@ -1843,6 +1844,7 @@ export default function App() {
     const allowedDevice = formData.get('allowedDevice') as string;
     const deviceId = formData.get('deviceId') as string;
     const canRemoteCheckIn = formData.get('canRemoteCheckIn') === 'true';
+    const rfidTag = (formData.get('rfidTag') as string || '').trim().toUpperCase();
 
     try {
       const response = await fetch('/api/users/update', {
@@ -1851,7 +1853,7 @@ export default function App() {
         body: JSON.stringify({ 
           adminUid: profile.uid,
           targetUid: editingUser.uid,
-          updates: { name, title, password, role, managerId, leaveBalance, startDate, birthDate, allowedDevice, deviceId, canRemoteCheckIn }
+          updates: { name, title, password, role, managerId, leaveBalance, startDate, birthDate, allowedDevice, deviceId, canRemoteCheckIn, rfidTag: rfidTag || null }
         })
       });
 
@@ -3122,6 +3124,19 @@ export default function App() {
                       className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm focus:border-orange-500 focus:outline-none"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-zinc-500 uppercase flex items-center gap-1.5">
+                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
+                      RFID Kart UID (ESP32)
+                    </label>
+                    <input 
+                      name="rfidTag"
+                      type="text"
+                      placeholder="Örn: A1B2C3D4 (kart okutulunca otomatik girilir)"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm font-mono focus:border-orange-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-zinc-600">ESP32 cihazı ilk okutmada bu alanı otomatik doldurabilir veya buraya manuel girebilirsiniz.</p>
+                  </div>
                   <div className="md:col-span-2">
                     <label className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 cursor-pointer hover:border-orange-500/50 transition-colors">
                       <input 
@@ -4373,6 +4388,28 @@ export default function App() {
                         <p className="text-[11px] text-zinc-500 mt-0.5">Bu personel ofis dışından (nakliyede) da giriş-çıkış yapabilir. Konumu kaydedilir, yöneticileri bildirim alır.</p>
                       </div>
                     </label>
+                  </div>
+
+                  {/* RFID Kart */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-zinc-500 uppercase flex items-center gap-1.5">
+                      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" /></svg>
+                      RFID Kart UID (ESP32)
+                    </label>
+                    {editingUser.rfidTag && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-[11px] font-mono font-bold text-emerald-400">{editingUser.rfidTag}</span>
+                        <span className="text-[10px] text-zinc-500">Tanımlı kart</span>
+                      </div>
+                    )}
+                    <input 
+                      name="rfidTag"
+                      type="text"
+                      defaultValue={editingUser.rfidTag || ''}
+                      placeholder="Kart UID girin (boş bırakılırsa kaldırılır)"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm font-mono focus:border-orange-500 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-zinc-600">ESP32 cihazı ilk kart okutmada otomatik doldurabilir. Boş bırakırsanız kart tanımı kaldırılır.</p>
                   </div>
 
                   <div className="space-y-2">

@@ -23,6 +23,12 @@ if (!SYSTEM_KEY) {
 }
 const ACTIVE_SYSTEM_KEY = SYSTEM_KEY || 'pdk_system_secret_2026';
 
+// ESP32 / Donanım cihaz anahtarı
+const DEVICE_KEY = process.env.PDKS_DEVICE_KEY;
+if (!DEVICE_KEY) {
+  console.warn("WARNING: PDKS_DEVICE_KEY not set. ESP32 device checkin endpoint will reject all requests.");
+}
+
 // VAPID Ayarları (Push Notifications)
 const VAPID_PUBLIC_KEY = 'BOPBnKZxgQDkPI2W4reXfIxX4JvL_fmvxEStJMCwZ5VR8OCWongeK167qF3ag0_Liq0CkxvKpGM307hbTr3gJtY';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'EfwIsNpBa3Q3Mcs1iPT9W6rz6avexMjw7QWXNMUh_iY';
@@ -475,6 +481,140 @@ async function startServer() {
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ======================================================
+  // ESP32 / Donanım Cihaz Giriş/Çıkış Endpoint'i
+  // ======================================================
+  app.post('/api/device/checkin', async (req, res) => {
+    if (!db) return res.status(500).json({ error: 'Database not ready' });
+
+    const { deviceKey, rfidTag, personnelId, type, method, deviceId, timestamp } = req.body;
+
+    // 1. Cihaz anahtarı doğrulama
+    if (!DEVICE_KEY || deviceKey !== DEVICE_KEY) {
+      return res.status(401).json({ success: false, error: 'Yetkisiz cihaz', code: 'UNAUTHORIZED_DEVICE' });
+    }
+
+    // 2. Zorunlu alan kontrolleri
+    if (!type || !['in', 'out'].includes(type)) {
+      return res.status(400).json({ success: false, error: 'Geçersiz işlem tipi (in/out)', code: 'INVALID_TYPE' });
+    }
+    if (!rfidTag && !personnelId) {
+      return res.status(400).json({ success: false, error: 'rfidTag veya personnelId gerekli', code: 'MISSING_IDENTIFIER' });
+    }
+
+    // 3. Timestamp kontrolü (5 dakikadan eski istekleri reddet)
+    if (timestamp) {
+      const requestTime = new Date(timestamp);
+      const now = new Date();
+      const diffMinutes = Math.abs(now.getTime() - requestTime.getTime()) / 60000;
+      if (diffMinutes > 5) {
+        return res.status(400).json({ success: false, error: 'Süresi dolmuş istek', code: 'EXPIRED_REQUEST' });
+      }
+    }
+
+    try {
+      let userDoc: any = null;
+
+      // 4a. RFID ile kullanıcı bul
+      if (rfidTag) {
+        const q = query(collection(db, 'users'), where('rfidTag', '==', rfidTag.toUpperCase().trim()), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) userDoc = snap.docs[0];
+      }
+
+      // 4b. personnelId ile kullanıcı bul (fallback)
+      if (!userDoc && personnelId) {
+        const q = query(collection(db, 'users'), where('personnelId', '==', personnelId), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) userDoc = snap.docs[0];
+      }
+
+      if (!userDoc) {
+        return res.status(404).json({ success: false, error: 'Kart veya personel bulunamadı', code: 'USER_NOT_FOUND' });
+      }
+
+      const userData = userDoc.data();
+
+      if (userData.role === 'deleted') {
+        return res.status(403).json({ success: false, error: 'Hesap devre dışı', code: 'ACCOUNT_DISABLED' });
+      }
+
+      // 5. Tolerans kontrolü (sadece giriş için)
+      let recordedTime = timestamp ? new Date(timestamp) : new Date();
+      let toleranceApplied = false;
+      let toleranceMessage = '';
+
+      try {
+        const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
+        if (settingsSnap.exists() && type === 'in') {
+          const settings = settingsSnap.data();
+          if (settings.shiftStart && settings.toleranceMinutes) {
+            const [h, m] = settings.shiftStart.split(':').map(Number);
+            const shiftStart = new Date(recordedTime);
+            shiftStart.setHours(h, m, 0, 0);
+            const diffMins = Math.floor((recordedTime.getTime() - shiftStart.getTime()) / 60000);
+            if (diffMins >= 0 && diffMins <= settings.toleranceMinutes) {
+              recordedTime = shiftStart;
+              toleranceApplied = true;
+              toleranceMessage = 'Tolerans uygulandı, giriş saati mesai başlangıcına çekildi.';
+            }
+          }
+        }
+      } catch (e) {
+        // Settings okunamazsa tolerans uygulanmadan devam et
+      }
+
+      // 6. Attendance kaydı oluştur
+      await addDoc(collection(db, 'attendance'), {
+        userId: userDoc.id,
+        userName: userData.name,
+        type,
+        method: method || 'rfid',
+        deviceId: deviceId || 'ESP32-UNKNOWN',
+        ipAddress: deviceId || 'ESP32',
+        status: 'success',
+        isRemote: false,
+        location: null,
+        timestamp: recordedTime,
+        toleranceApplied,
+        _system_key: ACTIVE_SYSTEM_KEY
+      });
+
+      // 7. Yöneticiye push bildirimi gönder
+      if (userData.managerId) {
+        const typeText = type === 'in' ? 'Giriş' : 'Çıkış';
+        const title = `${userData.name} - ${typeText} (${deviceId || 'ESP32'})`;
+        const body = `${recordedTime.toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' })} saatinde ${typeText.toLowerCase()} yaptı.${toleranceApplied ? ' ✅ Tolerans uygulandı.' : ''}`;
+        
+        await sendPushToUser(db, userData.managerId, title, body, '/movements');
+        
+        await addDoc(collection(db, 'notifications'), {
+          userId: userData.managerId,
+          title,
+          message: body,
+          type: 'info',
+          read: false,
+          link: '/movements',
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      res.json({
+        success: true,
+        userName: userData.name,
+        type,
+        recordedTime: recordedTime.toISOString(),
+        toleranceApplied,
+        toleranceMessage,
+        message: `${type === 'in' ? 'Giriş' : 'Çıkış'} başarıyla kaydedildi`
+      });
+
+    } catch (error: any) {
+      console.error('Device checkin error:', error);
+      res.status(500).json({ success: false, error: 'Sistem hatası', details: error.message });
     }
   });
 

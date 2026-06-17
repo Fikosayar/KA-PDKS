@@ -34,6 +34,7 @@ export interface UserProfile {
   deviceId?: string;
   pushSubscription?: string; // JSON string of PushSubscription
   canRemoteCheckIn?: boolean; // Nakliye/uzaktan giriş yetkisi
+  rfidTag?: string;           // ESP32 RFID kart UID (örn: "A1B2C3D4")
   avatarUrl?: string; // Profil fotoğrafı URL
   createdAt: string;
 }
