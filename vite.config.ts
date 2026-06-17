@@ -17,6 +17,12 @@ export default defineConfig(({mode}) => {
         },
         workbox: {
           importScripts: ['/sw-push.js'],
+          // Public klasöründeki statik dosyaları da önbellek takibine al.
+          // Bu sayede logo vb. değiştiğinde servis çalışanı güncellenir.
+          globPatterns: [
+            '**/*.{js,css,html,ico,svg,woff,woff2,webp}',
+            'logo*.{png,jpg}',
+          ],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
