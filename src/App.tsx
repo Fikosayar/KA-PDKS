@@ -187,11 +187,19 @@ export default function App() {
   // PWA Güncelleme
   const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW();
 
+  // ----------------------------------------------------------------
+  // LOGO SÜRÜMÜ - Logo değiştiğinde bu sabiti güncelleyin: v2 -> v3 vb.
+  // ----------------------------------------------------------------
+  const LOGO_VERSION = 'v2';
+
   // PWA Kurulum prompt'u (Android/Desktop)
   const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   // iOS Safari yönlendirme prompt'u
   const [showIosInstallGuide, setShowIosInstallGuide] = useState(false);
+
+  // Logo güncelleme - PWA yeniden kurulum rehberi
+  const [showIconReinstallGuide, setShowIconReinstallGuide] = useState(false);
 
   // Talepler sekmesi için geçmiş taleplerin ay filtresi
   const [requestMonth, setRequestMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -237,6 +245,25 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
+  // Logo sürüm kontrolü - sadece PWA kurulu (standalone) iken çalışır
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || (window.navigator as any).standalone === true;
+    if (!isStandalone) return; // Tarayıcıda açıksa hiç gösterme
+
+    const storedLogoVersion = localStorage.getItem('pwa-logo-version');
+    if (storedLogoVersion !== LOGO_VERSION) {
+      // Sürüm farklı veya hiç kaydedilmemiş: rehberi göster
+      // Not: ilk kez kurulumda da gelmesin diye 'pwa-logo-version' yoksa kaydet sadece
+      if (storedLogoVersion === null) {
+        // İlk kurulum - mevcut versiyonü kaydet, modal gösterme
+        localStorage.setItem('pwa-logo-version', LOGO_VERSION);
+      } else {
+        // Eski versiyon var, yeni versiyon farklı - rehber göster
+        setShowIconReinstallGuide(true);
+      }
+    }
+  }, [LOGO_VERSION]);
 
   const getEffectiveLeaveBalance = (u: UserProfile | null) => {
     if (!u) return 0;
@@ -5475,6 +5502,130 @@ export default function App() {
       </main>
 
 
+
+      {/* === LOGO GÜNCELLEMESİ - YENİDEN KURULUM REHBERİ === */}
+      <AnimatePresence>
+        {showIconReinstallGuide && (() => {
+          const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+          const isAndroid = /android/i.test(navigator.userAgent);
+          return (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex items-end justify-center bg-black/80 backdrop-blur-sm p-4"
+            >
+              <motion.div
+                initial={{ y: 120, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 120, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                className="w-full max-w-sm rounded-3xl border border-zinc-800 bg-zinc-900 overflow-hidden shadow-2xl"
+              >
+                {/* Başlık */}
+                <div className="p-5 border-b border-zinc-800">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 shrink-0">
+                      <img src="/logo192-v2.png" alt="Yeni Logo" className="h-8 w-8 rounded-lg object-cover" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-white text-sm">Uygulama Simgesi Güncellendi</p>
+                      <p className="text-xs text-zinc-500">Yeni simgeyi görmek için yeniden kurulum gerekiyor</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                    <p className="text-xs text-amber-400 leading-relaxed">
+                      ⚠️ Uygulama içeriği otomatik güncellendi. Ancak ana ekran simgesi işletim sistemi tarafından yönetildiği için simgeyi güncellemek için uygulamayı kaldırıp yeniden kurmanız gerekiyor.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Adımlar */}
+                <div className="p-5 space-y-3">
+                  {isIos ? (
+                    <>
+                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">iPhone / iPad</p>
+                      {[
+                        { n: 1, text: 'Ana ekranda PDKS simgesine uzun basın' },
+                        { n: 2, text: '"Uygulamayı Sil" veya "Sil"e dokunun → onaylayın' },
+                        { n: 3, text: 'Safari\'de siteyi açın (aşağıdaki butona basın)' },
+                        { n: 4, text: 'Paylaş simgesi → "Ana Ekrana Ekle"ye dokunun' },
+                      ].map(({ n, text }) => (
+                        <div key={n} className="flex items-start gap-3">
+                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white text-[11px] font-black">{n}</div>
+                          <p className="text-sm text-zinc-300 leading-snug">{text}</p>
+                        </div>
+                      ))}
+                      <a
+                        href="https://ka-pdks.onrender.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-500 transition"
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        Safari\'de Aç
+                      </a>
+                    </>
+                  ) : isAndroid ? (
+                    <>
+                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Android</p>
+                      {[
+                        { n: 1, text: 'Ana ekranda PDKS simgesine uzun basın' },
+                        { n: 2, text: '"Kaldır" veya "Uygulamayı kaldır"a dokunun' },
+                        { n: 3, text: 'Chrome\'da siteyi açın (aşağıdaki butona basın)' },
+                        { n: 4, text: 'Sağ üst köşedeki 3 nokta menüsü → "Ana ekrana ekle"ye dokunun' },
+                      ].map(({ n, text }) => (
+                        <div key={n} className="flex items-start gap-3">
+                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white text-[11px] font-black">{n}</div>
+                          <p className="text-sm text-zinc-300 leading-snug">{text}</p>
+                        </div>
+                      ))}
+                      <a
+                        href="googlechrome://navigate?url=https://ka-pdks.onrender.com"
+                        className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-500 transition"
+                        onClick={(e) => {
+                          // googlechrome:// açılmazsa normal URL'e git
+                          setTimeout(() => { window.location.href = 'https://ka-pdks.onrender.com'; }, 1500);
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        Chrome\'da Aç
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Masaüstü</p>
+                      {[
+                        { n: 1, text: 'Tarayıcı adres çubuğundaki kurulum simgesine tıklayın' },
+                        { n: 2, text: '"Kaldır" seçeneğini seçin' },
+                        { n: 3, text: 'Sayfayı yenileyin ve tekrar kurun' },
+                      ].map(({ n, text }) => (
+                        <div key={n} className="flex items-start gap-3">
+                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-500 text-white text-[11px] font-black">{n}</div>
+                          <p className="text-sm text-zinc-300 leading-snug">{text}</p>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+
+                {/* Alt buton */}
+                <div className="px-5 pb-5">
+                  <button
+                    onClick={() => {
+                      localStorage.setItem('pwa-logo-version', LOGO_VERSION);
+                      setShowIconReinstallGuide(false);
+                    }}
+                    className="w-full rounded-xl bg-zinc-800 py-3 text-sm font-bold text-zinc-400 hover:bg-zinc-700 transition"
+                  >
+                    Daha Sonra Hatırlat
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          );
+        })()}
+      </AnimatePresence>
 
       {/* === PWA GÜNCELLEME BANNER'I === */}
       <AnimatePresence>
