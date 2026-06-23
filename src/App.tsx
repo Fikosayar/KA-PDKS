@@ -2263,7 +2263,7 @@ export default function App() {
                     setScanType('out'); setShowScanner(true);
                   }
                 }}
-                className="group relative flex flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl bg-red-600 p-8 text-white transition-all hover:bg-red-500"
+                className="group relative flex flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl bg-purple-600 p-8 text-white transition-all hover:bg-purple-500"
               >
                 <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10 transition-transform group-hover:scale-150" />
                 <LogOut size={40} />
