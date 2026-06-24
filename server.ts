@@ -542,28 +542,33 @@ async function startServer() {
         return res.status(403).json({ success: false, error: 'Hesap devre dışı', code: 'ACCOUNT_DISABLED' });
       }
 
-      // 5. AUTO MOD: Son kaydı sorgula, giriş/çıkış kararını sunucu versin
+      // 5. AUTO MOD: Son kaydı sorgula + Ayarları paralel çek
       let resolvedType: 'in' | 'out' = type as 'in' | 'out';
       let earlyExit = false;
       const ONE_HOUR_MS = 60 * 60 * 1000;
 
-      if (type === 'auto') {
-        try {
-          const lastQ = query(
-            collection(db, 'attendance'),
-            where('userId', '==', userDoc.id),
-            where('deleted', '!=', true),
-            orderBy('deleted'),
-            orderBy('timestamp', 'desc'),
-            limit(1)
-          );
-          const lastSnap = await getDocs(lastQ);
+      // Kullanıcı bulununca ayarları ve son kaydı aynı anda sorgula
+      const [settingsSnap, lastSnap] = await Promise.all([
+        getDoc(doc(db, 'settings', 'global')).catch(() => null),
+        type === 'auto'
+          ? getDocs(query(
+              collection(db, 'attendance'),
+              where('userId', '==', userDoc.id),
+              orderBy('timestamp', 'desc'),
+              limit(1)
+            )).catch(() => null)
+          : Promise.resolve(null)
+      ]);
 
-          if (lastSnap.empty) {
-            // Hiç kaydı yok → giriş
+      if (type === 'auto') {
+        if (!lastSnap || lastSnap.empty) {
+          resolvedType = 'in';
+        } else {
+          const lastRecord = lastSnap.docs[0].data();
+          // Silinmiş kayıtları atla
+          if (lastRecord.deleted) {
             resolvedType = 'in';
           } else {
-            const lastRecord = lastSnap.docs[0].data();
             const lastType = lastRecord.type as string;
             const lastTime = lastRecord.timestamp?.toDate
               ? lastRecord.timestamp.toDate()
@@ -571,45 +576,36 @@ async function startServer() {
             const elapsedMs = Date.now() - lastTime.getTime();
 
             if (lastType === 'out') {
-              // Son işlem çıkış → yeni giriş
               resolvedType = 'in';
             } else if (lastType === 'in' && elapsedMs >= ONE_HOUR_MS) {
-              // Son girişin üzerine 1 saat geçmiş → normal çıkış
               resolvedType = 'out';
               earlyExit = false;
             } else {
-              // Son girişin üzerine 1 saat geçmemiş → erken çıkış
               resolvedType = 'out';
               earlyExit = true;
             }
           }
-        } catch (e) {
-          // Sorgu başarısız olursa güvenli default: giriş
-          resolvedType = 'in';
         }
       }
+
+      // Tolerans kontrolü (sadece giriş için)
       let recordedTime = timestamp ? new Date(timestamp) : new Date();
       let toleranceApplied = false;
       let toleranceMessage = '';
 
-      try {
-        const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
-        if (settingsSnap.exists() && resolvedType === 'in') {
-          const settings = settingsSnap.data();
-          if (settings.shiftStart && settings.toleranceMinutes) {
-            const [h, m] = settings.shiftStart.split(':').map(Number);
-            const shiftStart = new Date(recordedTime);
-            shiftStart.setHours(h, m, 0, 0);
-            const diffMins = Math.floor((recordedTime.getTime() - shiftStart.getTime()) / 60000);
-            if (diffMins >= 0 && diffMins <= settings.toleranceMinutes) {
-              recordedTime = shiftStart;
-              toleranceApplied = true;
-              toleranceMessage = 'Tolerans uygulandı, giriş saati mesai başlangıcına çekildi.';
-            }
+      if (settingsSnap && settingsSnap.exists() && resolvedType === 'in') {
+        const settings = settingsSnap.data();
+        if (settings.shiftStart && settings.toleranceMinutes) {
+          const [h, m] = settings.shiftStart.split(':').map(Number);
+          const shiftStart = new Date(recordedTime);
+          shiftStart.setHours(h, m, 0, 0);
+          const diffMins = Math.floor((recordedTime.getTime() - shiftStart.getTime()) / 60000);
+          if (diffMins >= 0 && diffMins <= settings.toleranceMinutes) {
+            recordedTime = shiftStart;
+            toleranceApplied = true;
+            toleranceMessage = 'Tolerans uygulandı, giriş saati mesai başlangıcına çekildi.';
           }
         }
-      } catch (e) {
-        // Settings okunamazsa tolerans uygulanmadan devam et
       }
 
       // 6. Attendance kaydı oluştur
@@ -629,26 +625,7 @@ async function startServer() {
         _system_key: ACTIVE_SYSTEM_KEY
       });
 
-      // 7. Yöneticiye push bildirimi gönder
-      if (userData.managerId) {
-        const typeText = resolvedType === 'in' ? 'Giriş' : 'Çıkış';
-        const earlyTag = earlyExit ? ' ⚠️ Erken Çıkış' : '';
-        const title = `${userData.name} - ${typeText}${earlyTag} (${deviceId || 'ESP32'})`;
-        const body = `${recordedTime.toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' })} saatinde ${typeText.toLowerCase()} yaptı.${toleranceApplied ? ' ✅ Tolerans uygulandı.' : ''}${earlyExit ? ' ⚠️ 1 saatten kısa sürede çıkış!' : ''}`;
-
-        await sendPushToUser(db, userData.managerId, title, body, '/movements');
-
-        await addDoc(collection(db, 'notifications'), {
-          userId: userData.managerId,
-          title,
-          message: body,
-          type: earlyExit ? 'warning' : 'info',
-          read: false,
-          link: '/movements',
-          createdAt: new Date().toISOString()
-        });
-      }
-
+      // 7. Yanıtı HEMEN gönder — push bildirimi arka planda çalışır (fire & forget)
       res.json({
         success: true,
         userName: userData.name,
@@ -659,6 +636,26 @@ async function startServer() {
         toleranceMessage,
         message: `${resolvedType === 'in' ? 'Giriş' : 'Çıkış'} başarıyla kaydedildi`
       });
+
+      // Push bildirimi yanıt döndükten SONRA gönderilir
+      if (userData.managerId) {
+        const typeText = resolvedType === 'in' ? 'Giriş' : 'Çıkış';
+        const earlyTag = earlyExit ? ' ⚠️ Erken Çıkış' : '';
+        const title = `${userData.name} - ${typeText}${earlyTag} (${deviceId || 'ESP32'})`;
+        const body = `${recordedTime.toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' })} saatinde ${typeText.toLowerCase()} yaptı.${toleranceApplied ? ' ✅ Tolerans uygulandı.' : ''}${earlyExit ? ' ⚠️ 1 saatten kısa sürede çıkış!' : ''}`;
+
+        sendPushToUser(db, userData.managerId, title, body, '/movements').catch(() => {});
+        addDoc(collection(db, 'notifications'), {
+          userId: userData.managerId,
+          title,
+          message: body,
+          type: earlyExit ? 'warning' : 'info',
+          read: false,
+          link: '/movements',
+          createdAt: new Date().toISOString()
+        }).catch(() => {});
+      }
+
 
     } catch (error: any) {
       console.error('Device checkin error:', error);
