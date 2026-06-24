@@ -5564,7 +5564,7 @@ export default function App() {
                         </div>
                       ))}
                       <a
-                        href="https://ka-pdks.onrender.com"
+                        href="https://kapdks.sapanca360.com"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white hover:bg-blue-500 transition"
@@ -5588,11 +5588,11 @@ export default function App() {
                         </div>
                       ))}
                       <a
-                        href="googlechrome://navigate?url=https://ka-pdks.onrender.com"
+                        href="googlechrome://navigate?url=https://kapdks.sapanca360.com"
                         className="mt-2 flex items-center justify-center gap-2 w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-500 transition"
                         onClick={(e) => {
                           // googlechrome:// açılmazsa normal URL'e git
-                          setTimeout(() => { window.location.href = 'https://ka-pdks.onrender.com'; }, 1500);
+                          setTimeout(() => { window.location.href = 'https://kapdks.sapanca360.com'; }, 1500);
                         }}
                       >
                         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
