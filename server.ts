@@ -7,7 +7,7 @@ import { createServer as createViteServer } from 'vite';
 import { initializeApp as initializeAdminApp } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, where, limit, getDocs, doc, getDoc, setDoc, addDoc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, orderBy, limit, getDocs, doc, getDoc, setDoc, addDoc } from 'firebase/firestore';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import webpush from 'web-push';
@@ -498,8 +498,8 @@ async function startServer() {
     }
 
     // 2. Zorunlu alan kontrolleri
-    if (!type || !['in', 'out'].includes(type)) {
-      return res.status(400).json({ success: false, error: 'Geçersiz işlem tipi (in/out)', code: 'INVALID_TYPE' });
+    if (!type || !['in', 'out', 'auto'].includes(type)) {
+      return res.status(400).json({ success: false, error: 'Geçersiz işlem tipi (in/out/auto)', code: 'INVALID_TYPE' });
     }
     if (!rfidTag && !personnelId) {
       return res.status(400).json({ success: false, error: 'rfidTag veya personnelId gerekli', code: 'MISSING_IDENTIFIER' });
@@ -542,14 +542,59 @@ async function startServer() {
         return res.status(403).json({ success: false, error: 'Hesap devre dışı', code: 'ACCOUNT_DISABLED' });
       }
 
-      // 5. Tolerans kontrolü (sadece giriş için)
+      // 5. AUTO MOD: Son kaydı sorgula, giriş/çıkış kararını sunucu versin
+      let resolvedType: 'in' | 'out' = type as 'in' | 'out';
+      let earlyExit = false;
+      const ONE_HOUR_MS = 60 * 60 * 1000;
+
+      if (type === 'auto') {
+        try {
+          const lastQ = query(
+            collection(db, 'attendance'),
+            where('userId', '==', userDoc.id),
+            where('deleted', '!=', true),
+            orderBy('deleted'),
+            orderBy('timestamp', 'desc'),
+            limit(1)
+          );
+          const lastSnap = await getDocs(lastQ);
+
+          if (lastSnap.empty) {
+            // Hiç kaydı yok → giriş
+            resolvedType = 'in';
+          } else {
+            const lastRecord = lastSnap.docs[0].data();
+            const lastType = lastRecord.type as string;
+            const lastTime = lastRecord.timestamp?.toDate
+              ? lastRecord.timestamp.toDate()
+              : new Date(lastRecord.timestamp);
+            const elapsedMs = Date.now() - lastTime.getTime();
+
+            if (lastType === 'out') {
+              // Son işlem çıkış → yeni giriş
+              resolvedType = 'in';
+            } else if (lastType === 'in' && elapsedMs >= ONE_HOUR_MS) {
+              // Son girişin üzerine 1 saat geçmiş → normal çıkış
+              resolvedType = 'out';
+              earlyExit = false;
+            } else {
+              // Son girişin üzerine 1 saat geçmemiş → erken çıkış
+              resolvedType = 'out';
+              earlyExit = true;
+            }
+          }
+        } catch (e) {
+          // Sorgu başarısız olursa güvenli default: giriş
+          resolvedType = 'in';
+        }
+      }
       let recordedTime = timestamp ? new Date(timestamp) : new Date();
       let toleranceApplied = false;
       let toleranceMessage = '';
 
       try {
         const settingsSnap = await getDoc(doc(db, 'settings', 'global'));
-        if (settingsSnap.exists() && type === 'in') {
+        if (settingsSnap.exists() && resolvedType === 'in') {
           const settings = settingsSnap.data();
           if (settings.shiftStart && settings.toleranceMinutes) {
             const [h, m] = settings.shiftStart.split(':').map(Number);
@@ -571,7 +616,7 @@ async function startServer() {
       await addDoc(collection(db, 'attendance'), {
         userId: userDoc.id,
         userName: userData.name,
-        type,
+        type: resolvedType,
         method: method || 'rfid',
         deviceId: deviceId || 'ESP32-UNKNOWN',
         ipAddress: deviceId || 'ESP32',
@@ -580,22 +625,24 @@ async function startServer() {
         location: null,
         timestamp: recordedTime,
         toleranceApplied,
+        earlyExit,
         _system_key: ACTIVE_SYSTEM_KEY
       });
 
       // 7. Yöneticiye push bildirimi gönder
       if (userData.managerId) {
-        const typeText = type === 'in' ? 'Giriş' : 'Çıkış';
-        const title = `${userData.name} - ${typeText} (${deviceId || 'ESP32'})`;
-        const body = `${recordedTime.toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' })} saatinde ${typeText.toLowerCase()} yaptı.${toleranceApplied ? ' ✅ Tolerans uygulandı.' : ''}`;
-        
+        const typeText = resolvedType === 'in' ? 'Giriş' : 'Çıkış';
+        const earlyTag = earlyExit ? ' ⚠️ Erken Çıkış' : '';
+        const title = `${userData.name} - ${typeText}${earlyTag} (${deviceId || 'ESP32'})`;
+        const body = `${recordedTime.toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' })} saatinde ${typeText.toLowerCase()} yaptı.${toleranceApplied ? ' ✅ Tolerans uygulandı.' : ''}${earlyExit ? ' ⚠️ 1 saatten kısa sürede çıkış!' : ''}`;
+
         await sendPushToUser(db, userData.managerId, title, body, '/movements');
-        
+
         await addDoc(collection(db, 'notifications'), {
           userId: userData.managerId,
           title,
           message: body,
-          type: 'info',
+          type: earlyExit ? 'warning' : 'info',
           read: false,
           link: '/movements',
           createdAt: new Date().toISOString()
@@ -605,11 +652,12 @@ async function startServer() {
       res.json({
         success: true,
         userName: userData.name,
-        type,
+        type: resolvedType,
+        earlyExit,
         recordedTime: recordedTime.toISOString(),
         toleranceApplied,
         toleranceMessage,
-        message: `${type === 'in' ? 'Giriş' : 'Çıkış'} başarıyla kaydedildi`
+        message: `${resolvedType === 'in' ? 'Giriş' : 'Çıkış'} başarıyla kaydedildi`
       });
 
     } catch (error: any) {
